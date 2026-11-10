@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hive/hive.dart';
 
 import 'note_list_screen.dart';
 
@@ -10,15 +11,37 @@ class FolderListScreen extends StatefulWidget {
 }
 
 class _FolderListScreenState extends State<FolderListScreen> {
-  final List<String> folders = <String>['Личное', 'Работа'];
   bool _isDark = false;
+  List<String> folders = <String>[];
+  Box? _box;
+  bool _loading = true;
 
-  void _toggleTheme() {
+  @override
+  void initState() {
+    super.initState();
+    _openBox();
+  }
+
+  Future<void> _openBox() async {
+    final Box box = await Hive.openBox('folders_box');
+    final List<String> loaded = box.values
+        .map((dynamic e) => e.toString())
+        .toList();
     setState(() {
-      _isDark = !_isDark;
+      _box = box;
+      folders = loaded;
+      _loading = false;
     });
-    final MaterialApp app = context.findAncestorWidgetOfExactType<MaterialApp>()!;
-    app.themeMode;
+  }
+
+  Future<void> _reload() async {
+    if (_box == null) return;
+    final List<String> loaded = _box!.values
+        .map((dynamic e) => e.toString())
+        .toList();
+    setState(() {
+      folders = loaded;
+    });
   }
 
   Future<void> _showCreateFolderDialog() async {
@@ -42,17 +65,17 @@ class _FolderListScreenState extends State<FolderListScreen> {
               child: const Text('Отмена'),
             ),
             FilledButton(
-              onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+              onPressed: () =>
+                  Navigator.of(context).pop(controller.text.trim()),
               child: const Text('Создать'),
             ),
           ],
         );
       },
     );
-    if (name != null && name.isNotEmpty) {
-      setState(() {
-        folders.add(name);
-      });
+    if (name != null && name.isNotEmpty && _box != null) {
+      await _box!.add(name);
+      await _reload();
     }
     controller.dispose();
   }
@@ -69,7 +92,6 @@ class _FolderListScreenState extends State<FolderListScreen> {
           title: Text(currentName),
           content: TextField(
             controller: controller,
-            autofocus: false,
             decoration: const InputDecoration(
               labelText: 'Имя папки',
               border: OutlineInputBorder(),
@@ -77,11 +99,13 @@ class _FolderListScreenState extends State<FolderListScreen> {
           ),
           actions: <Widget>[
             TextButton(
-              onPressed: () {
-                setState(() {
-                  folders.removeAt(index);
-                });
-                Navigator.of(context).pop();
+              onPressed: () async {
+                if (_box != null) {
+                  final dynamic key = _box!.keyAt(index);
+                  await _box!.delete(key);
+                  await _reload();
+                }
+                if (context.mounted) Navigator.of(context).pop();
               },
               child: const Text(
                 'Удалить',
@@ -93,14 +117,14 @@ class _FolderListScreenState extends State<FolderListScreen> {
               child: const Text('Отмена'),
             ),
             FilledButton(
-              onPressed: () {
+              onPressed: () async {
                 final String newName = controller.text.trim();
-                if (newName.isNotEmpty) {
-                  setState(() {
-                    folders[index] = newName;
-                  });
+                if (newName.isNotEmpty && _box != null) {
+                  final dynamic key = _box!.keyAt(index);
+                  await _box!.put(key, newName);
+                  await _reload();
                 }
-                Navigator.of(context).pop();
+                if (context.mounted) Navigator.of(context).pop();
               },
               child: const Text('Сохранить'),
             ),
@@ -145,25 +169,29 @@ class _FolderListScreenState extends State<FolderListScreen> {
                 ),
               ],
             ),
-            body: ListView.builder(
-              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-              itemCount: folders.length,
-              itemBuilder: (BuildContext context, int index) {
-                final String folder = folders[index];
-                return Card(
-                  margin: const EdgeInsets.symmetric(vertical: 4),
-                  child: ListTile(
-                    leading: const Icon(Icons.folder),
-                    title: Text(folder),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => _openFolder(folder),
-                    onLongPress: () => _showFolderOptionsDialog(index),
+            body: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 8, horizontal: 12),
+                    itemCount: folders.length,
+                    itemBuilder: (BuildContext context, int index) {
+                      final String folder = folders[index];
+                      return Card(
+                        margin: const EdgeInsets.symmetric(vertical: 4),
+                        child: ListTile(
+                          leading: const Icon(Icons.folder),
+                          title: Text(folder),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () => _openFolder(folder),
+                          onLongPress: () =>
+                              _showFolderOptionsDialog(index),
+                        ),
+                      );
+                    },
                   ),
-                );
-              },
-            ),
             floatingActionButton: FloatingActionButton(
-              onPressed: _showCreateFolderDialog,
+              onPressed: _loading ? null : _showCreateFolderDialog,
               child: const Icon(Icons.add),
             ),
           );
