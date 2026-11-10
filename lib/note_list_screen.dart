@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hive/hive.dart';
 
 import 'note_edit_screen.dart';
 
@@ -12,7 +13,33 @@ class NoteListScreen extends StatefulWidget {
 }
 
 class _NoteListScreenState extends State<NoteListScreen> {
-  final List<String> notes = <String>['Список покупок', 'Идеи для проекта'];
+  List<String> notes = <String>[];
+  Box? _box;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _openBox();
+  }
+
+  Future<void> _openBox() async {
+    final Box box = await Hive.openBox('notes_list_box');
+    final dynamic stored = box.get(widget.folderName);
+    final List<String> loaded = stored is List
+        ? stored.map((dynamic e) => e.toString()).toList()
+        : <String>[];
+    setState(() {
+      _box = box;
+      notes = loaded;
+      _loading = false;
+    });
+  }
+
+  Future<void> _save() async {
+    if (_box == null) return;
+    await _box!.put(widget.folderName, notes);
+  }
 
   Future<void> _showCreateNoteDialog() async {
     final TextEditingController controller = TextEditingController();
@@ -47,6 +74,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
       setState(() {
         notes.add(title);
       });
+      await _save();
     }
     controller.dispose();
   }
@@ -70,11 +98,12 @@ class _NoteListScreenState extends State<NoteListScreen> {
           ),
           actions: <Widget>[
             TextButton(
-              onPressed: () {
+              onPressed: () async {
                 setState(() {
                   notes.removeAt(index);
                 });
-                Navigator.of(context).pop();
+                await _save();
+                if (context.mounted) Navigator.of(context).pop();
               },
               child: const Text(
                 'Удалить',
@@ -86,14 +115,15 @@ class _NoteListScreenState extends State<NoteListScreen> {
               child: const Text('Отмена'),
             ),
             FilledButton(
-              onPressed: () {
+              onPressed: () async {
                 final String newTitle = controller.text.trim();
                 if (newTitle.isNotEmpty) {
                   setState(() {
                     notes[index] = newTitle;
                   });
+                  await _save();
                 }
-                Navigator.of(context).pop();
+                if (context.mounted) Navigator.of(context).pop();
               },
               child: const Text('Сохранить'),
             ),
@@ -121,26 +151,29 @@ class _NoteListScreenState extends State<NoteListScreen> {
       appBar: AppBar(
         title: Text(widget.folderName),
       ),
-      body: ListView.builder(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-        itemCount: notes.length,
-        itemBuilder: (BuildContext context, int index) {
-          final String note = notes[index];
-          return Card(
-            margin: const EdgeInsets.symmetric(vertical: 4),
-            child: ListTile(
-              leading: const Icon(Icons.description_outlined),
-              title: Text(note),
-              subtitle: const Text('12.05.2024, 14:30'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => _openNote(note),
-              onLongPress: () => _showNoteOptionsDialog(index),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView.builder(
+              padding:
+                  const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+              itemCount: notes.length,
+              itemBuilder: (BuildContext context, int index) {
+                final String note = notes[index];
+                return Card(
+                  margin: const EdgeInsets.symmetric(vertical: 4),
+                  child: ListTile(
+                    leading: const Icon(Icons.description_outlined),
+                    title: Text(note),
+                    subtitle: const Text('12.05.2024, 14:30'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => _openNote(note),
+                    onLongPress: () => _showNoteOptionsDialog(index),
+                  ),
+                );
+              },
             ),
-          );
-        },
-      ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _showCreateNoteDialog,
+        onPressed: _loading ? null : _showCreateNoteDialog,
         child: const Icon(Icons.add),
       ),
     );
