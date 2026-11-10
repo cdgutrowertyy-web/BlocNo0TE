@@ -1,5 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 class NoteEditScreen extends StatefulWidget {
   const NoteEditScreen({
@@ -50,6 +54,24 @@ class _NoteEditScreenState extends State<NoteEditScreen>
     await _box!.put(_key, _controller.text);
   }
 
+  Future<void> _exportNote() async {
+    final String text = _controller.text;
+    String safeName = widget.noteTitle
+        .replaceAll(RegExp(r'[\\/:*?"<>|]'), '_')
+        .trim();
+    if (safeName.isEmpty) {
+      safeName = 'note';
+    }
+    final Directory dir = await getTemporaryDirectory();
+    final File file = File('${dir.path}/$safeName.txt');
+    await file.writeAsString(text);
+    await Share.shareXFiles(
+      <XFile>[XFile(file.path, mimeType: 'text/plain')],
+      subject: widget.noteTitle,
+      text: widget.noteTitle,
+    );
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
@@ -73,6 +95,13 @@ class _NoteEditScreenState extends State<NoteEditScreen>
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.noteTitle),
+        actions: <Widget>[
+          IconButton(
+            icon: const Icon(Icons.share),
+            tooltip: 'Экспорт в .txt',
+            onPressed: _loading ? null : _exportNote,
+          ),
+        ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
