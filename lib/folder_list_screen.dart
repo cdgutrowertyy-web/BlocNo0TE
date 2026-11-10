@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 
 import 'note_list_screen.dart';
+import 'settings_screen.dart';
 
 class FolderListScreen extends StatefulWidget {
   const FolderListScreen({super.key});
@@ -144,6 +145,14 @@ class _FolderListScreenState extends State<FolderListScreen> {
     );
   }
 
+  void _openSettings() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (BuildContext context) => const SettingsScreen(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Theme(
@@ -166,6 +175,11 @@ class _FolderListScreenState extends State<FolderListScreen> {
                       _isDark = !_isDark;
                     });
                   },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.settings),
+                  tooltip: 'Настройки',
+                  onPressed: _openSettings,
                 ),
               ],
             ),
