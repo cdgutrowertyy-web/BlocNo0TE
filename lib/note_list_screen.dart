@@ -41,6 +41,31 @@ class _NoteListScreenState extends State<NoteListScreen> {
     await _box!.put(widget.folderName, notes);
   }
 
+  String _formatDate(DateTime now) {
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${now.year}-${two(now.month)}-${two(now.day)} '
+        '${two(now.hour)}:${two(now.minute)}';
+  }
+
+  Future<bool> _isAutoDateName() async {
+    final Box settings = await Hive.openBox('settings_box');
+    final dynamic stored = settings.get('auto_date_name', defaultValue: false);
+    return stored is bool && stored;
+  }
+
+  Future<void> _onAddNotePressed() async {
+    final bool autoName = await _isAutoDateName();
+    if (autoName) {
+      final String title = _formatDate(DateTime.now());
+      setState(() {
+        notes.add(title);
+      });
+      await _save();
+      return;
+    }
+    await _showCreateNoteDialog();
+  }
+
   Future<void> _showCreateNoteDialog() async {
     final TextEditingController controller = TextEditingController();
     final String? title = await showDialog<String>(
@@ -173,7 +198,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
               },
             ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _loading ? null : _showCreateNoteDialog,
+        onPressed: _loading ? null : _onAddNotePressed,
         child: const Icon(Icons.add),
       ),
     );
