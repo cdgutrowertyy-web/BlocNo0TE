@@ -27,6 +27,16 @@ jobs:
       - name: Generate Android platform files
         run: flutter create --platforms android .
 
+      - name: Bump compileSdkVersion and targetSdkVersion to 34
+        run: |
+          sed -i 's/compileSdkVersion = 33/compileSdkVersion = 34/g' android/app/build.gradle
+          sed -i 's/compileSdkVersion 33/compileSdkVersion 34/g' android/app/build.gradle
+          sed -i 's/targetSdkVersion = 33/targetSdkVersion = 34/g' android/app/build.gradle
+          sed -i 's/targetSdkVersion 33/targetSdkVersion 34/g' android/app/build.gradle
+          sed -i 's/compileSdk = 33/compileSdk = 34/g' android/app/build.gradle
+          sed -i 's/targetSdk = 33/targetSdk = 34/g' android/app/build.gradle
+          grep -nE 'compileSdk|targetSdk' android/app/build.gradle
+
       - name: Install dependencies
         run: flutter pub get
 
